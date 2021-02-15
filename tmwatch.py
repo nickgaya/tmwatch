@@ -1,5 +1,7 @@
 import plistlib
+import signal
 import subprocess
+import threading
 import time
 from argparse import ArgumentParser
 from datetime import timedelta
@@ -8,6 +10,10 @@ from collections import namedtuple
 from progress.bar import IncrementalBar
 
 TmStatus = namedtuple('TmStatus', ('phase', 'percent', 'etr'))
+
+
+# Use a threading.Event for interruptible sleep
+stop_event = threading.Event()
 
 
 class TMBar(IncrementalBar):
@@ -94,12 +100,17 @@ def monitor(args):
     bar = TMBar()
     bar.start()
     bar.set(status)
-    while not should_exit(args, status):
-        time.sleep(args.interval)
+    while not (should_exit(args, status) or stop_event.wait(args.interval)):
         status = get_tm_status()
         bar.set(status)
     bar.finish()
 
+
+def setup_signal_handling():
+    def handler(signum, frame):
+        stop_event.set()
+
+    signal.signal(signal.SIGINT, handler)
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Monitor Time Machine backup progress')
@@ -108,4 +119,5 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--run-indefinitely', action='store_true',
                         help="Don't exit when backup completes")
     args = parser.parse_args()
+    setup_signal_handling()
     monitor(args)
