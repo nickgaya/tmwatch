@@ -2,8 +2,11 @@ import plistlib
 import subprocess
 import time
 from datetime import timedelta
+from collections import namedtuple
 
 from progress.bar import IncrementalBar
+
+TmStatus = namedtuple('TmStatus', ('phase', 'percent', 'etr'))
 
 class TMBar(IncrementalBar):
 
@@ -22,11 +25,11 @@ class TMBar(IncrementalBar):
         self.phase = ''
         self.etr = None
 
-    def set(self, phase, percent=None, etr=None):
-        self._set_phase(phase)
-        self.etr = etr
-        if percent is not None:
-            self.goto(percent)
+    def set(self, status):
+        self._set_phase(status.phase)
+        self.etr = status.etr
+        if status.percent is not None:
+            self.goto(status.percent)
         else:
             self.update()
 
@@ -65,17 +68,23 @@ def get_tm_status():
     progress = status.get('Progress')
     if progress:
         etr = progress.get('TimeRemaining')
-    return {
-        'phase': phase,
-        'percent': percent,
-        'etr': etr,
-    }
+    return TmStatus(
+        phase=phase,
+        percent=percent,
+        etr=etr,
+    )
 
 if __name__ == '__main__':
+    status = get_tm_status()
+    if status.phase == 'BackupNotRunning':
+        print('BackupNotRunning')
+        exit(0)
+
     bar = TMBar()
     bar.start()
-    bar.set(**get_tm_status())
-    while bar.phase != 'BackupNotRunning':
+    bar.set(status)
+    while status.phase != 'BackupNotRunning':
         time.sleep(2)
-        bar.set(**get_tm_status())
+        status = get_tm_status()
+        bar.set(status)
     bar.finish()
