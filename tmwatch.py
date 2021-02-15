@@ -8,7 +8,10 @@ from argparse import ArgumentParser
 from datetime import timedelta
 from collections import namedtuple
 
-from progress.bar import IncrementalBar
+try:
+    from progress.bar import IncrementalBar
+except ImportError:
+    from pip._vendor.progress.bar import IncrementalBar
 
 TmStatus = namedtuple('TmStatus', ('phase', 'percent', 'etr'))
 
