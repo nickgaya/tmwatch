@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 import contextlib
 import plistlib
 import shutil
@@ -95,7 +96,7 @@ def should_exit(args, status):
 
 
 def monitor(stack, args):
-    bar = bar = stack.enter_context(TMBar()) if args.show_progress else None
+    bar = stack.enter_context(TMBar()) if args.show_progress else None
     status = get_tm_status()
     display(args, bar, status)
 
