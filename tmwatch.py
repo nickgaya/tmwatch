@@ -1,3 +1,4 @@
+import contextlib
 import plistlib
 import shutil
 import signal
@@ -7,7 +8,6 @@ import time
 from argparse import ArgumentParser
 from datetime import timedelta
 from collections import namedtuple
-from contextlib import contextmanager
 
 from progress.bar import IncrementalBar
 
@@ -92,23 +92,14 @@ def should_exit(args, status):
     return status.phase == 'BackupNotRunning'
 
 
-@contextmanager
-def init_bar(args):
-    if args.show_progress:
-        with TMBar() as bar:
-            yield bar
-    else:
-        yield
+def monitor(stack, args):
+    bar = bar = stack.enter_context(TMBar()) if args.show_progress else None
+    status = get_tm_status()
+    display(args, bar, status)
 
-
-def monitor(args):
-    with init_bar(args) as bar:
+    while not (should_exit(args, status) or stop_event.wait(args.interval)):
         status = get_tm_status()
         display(args, bar, status)
-
-        while not (should_exit(args, status) or stop_event.wait(args.interval)):
-            status = get_tm_status()
-            display(args, bar, status)
 
 
 def tput(arg):
@@ -151,16 +142,11 @@ def setup_signal_handling():
     signal.signal(signal.SIGINT, handler)
 
 
-@contextmanager
-def prepare_term(args):
+def prepare_term(stack, args):
     if args.show_status:
+        # Enable alternate "screen" for displaying status
         tput('smcup')
-    try:
-        yield
-    finally:
-        if args.show_status:
-            tput('rmcup')
-
+        stack.callback(tput, 'rmcup')
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Monitor Time Machine backup progress')
@@ -173,6 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('-P', '--hide-progress',
                         dest='show_progress', action='store_false',
                         help="Disable progress bar")
+
     args = parser.parse_args()
     if args.run_indefinitely and not (args.show_status or args.show_progress):
         # Doesn't make sense to run indefinitely without displaying anything
@@ -180,5 +167,6 @@ if __name__ == '__main__':
 
     setup_signal_handling()
 
-    with prepare_term(args):
-        monitor(args)
+    with contextlib.ExitStack() as stack:
+        prepare_term(stack, args)
+        monitor(stack, args)
