@@ -99,13 +99,17 @@ def monitor(args):
         print(status.phase)
         exit(0)
 
-    bar = TMBar()
-    bar.start()
+    bar = TMBar() if args.show_progress else None
+    if bar:
+        bar.start()
+
     display(args, bar, status)
     while not (should_exit(args, status) or stop_event.wait(args.interval)):
         status = get_tm_status()
         display(args, bar, status)
-    bar.finish()
+
+    if bar:
+        bar.finish()
 
 
 def tput(arg):
@@ -129,11 +133,15 @@ def display(args, bar, status):
                                    text=True,
                                    check=True).stdout
         tsize = shutil.get_terminal_size()
-        hr_status_trunc = truncate(hr_status, tsize.lines - 2, tsize.columns)
+        dl = 2 if args.show_progress else 0
+        hr_status_trunc = truncate(hr_status, tsize.lines - dl, tsize.columns)
         clear()
-        bar.set(status)
-        print('\n\n', hr_status_trunc, sep='', end='', flush=True)
-    else:
+        if args.show_progress:
+            bar.set(status)
+            print('\n\n', hr_status_trunc, sep='', end='', flush=True)
+        else:
+            print(hr_status_trunc, end='', flush=True)
+    elif args.show_progress:
         bar.set(status)
 
 
@@ -149,7 +157,7 @@ def prepare_term(args):
     if args.show_status:
         tput('smcup')
     try:
-        monitor(args)
+        yield
     finally:
         if args.show_status:
             tput('rmcup')
@@ -163,7 +171,14 @@ if __name__ == '__main__':
                         help="Don't exit when backup completes")
     parser.add_argument('-s', '--show-status', action='store_true',
                         help="Show tmutil status output")
+    parser.add_argument('-S', '--show-status-only', action='store_true',
+                        help="Show tmutil status and hide progress bar")
     args = parser.parse_args()
+    if args.show_status_only:
+        args.show_status = True
+        args.show_progress = False
+    else:
+        args.show_progress = True
 
     setup_signal_handling()
 
