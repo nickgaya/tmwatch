@@ -1,6 +1,7 @@
 import plistlib
 import subprocess
 import time
+from argparse import ArgumentParser
 from datetime import timedelta
 from collections import namedtuple
 
@@ -74,7 +75,7 @@ def get_tm_status():
         etr=etr,
     )
 
-if __name__ == '__main__':
+def monitor(args):
     status = get_tm_status()
     if status.phase == 'BackupNotRunning':
         print('BackupNotRunning')
@@ -84,7 +85,14 @@ if __name__ == '__main__':
     bar.start()
     bar.set(status)
     while status.phase != 'BackupNotRunning':
-        time.sleep(2)
+        time.sleep(args.interval)
         status = get_tm_status()
         bar.set(status)
     bar.finish()
+
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Monitor Time Machine backup progress')
+    parser.add_argument('-n', '--interval', type=float, default=2,
+                        help="Update interval in seconds")
+    args = parser.parse_args()
+    monitor(args)
