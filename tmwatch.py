@@ -4,7 +4,6 @@ import shutil
 import signal
 import subprocess
 import threading
-import time
 from argparse import ArgumentParser
 from datetime import timedelta
 from collections import namedtuple
@@ -147,6 +146,7 @@ def prepare_term(stack, args):
         # Enable alternate "screen" for displaying status
         tput('smcup')
         stack.callback(tput, 'rmcup')
+
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Monitor Time Machine backup progress')
