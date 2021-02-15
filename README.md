@@ -21,4 +21,6 @@ Supported options:
 * `-s`/`--show-status`: Display the full output from `tmutil status`.
 
 * `-P`, `--hide-progress`: Disable the progress bar. This can be used to
-  non-interactively wait for a Time Machine backup to complete.
+  non-interactively wait for a Time Machine backup to complete. This can also
+  be used in conjunction with `-s`/`--show-status` to display only the status
+  output, similar to `watch tmutil status`.
