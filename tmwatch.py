@@ -170,3 +170,7 @@ if __name__ == '__main__':
     with contextlib.ExitStack() as stack:
         prepare_term(stack, args)
         monitor(stack, args)
+
+    if not args.run_indefinitely and stop_event.is_set():
+        # Exited due to SIGINT
+        exit(130)
