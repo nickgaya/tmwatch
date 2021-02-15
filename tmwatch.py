@@ -92,24 +92,23 @@ def should_exit(args, status):
     return status.phase == 'BackupNotRunning'
 
 
+@contextmanager
+def init_bar(args):
+    if args.show_progress:
+        with TMBar() as bar:
+            yield bar
+    else:
+        yield
+
+
 def monitor(args):
-    status = get_tm_status()
-
-    if should_exit(args, status):
-        print(status.phase)
-        exit(0)
-
-    bar = TMBar() if args.show_progress else None
-    if bar:
-        bar.start()
-
-    display(args, bar, status)
-    while not (should_exit(args, status) or stop_event.wait(args.interval)):
+    with init_bar(args) as bar:
         status = get_tm_status()
         display(args, bar, status)
 
-    if bar:
-        bar.finish()
+        while not (should_exit(args, status) or stop_event.wait(args.interval)):
+            status = get_tm_status()
+            display(args, bar, status)
 
 
 def tput(arg):
@@ -171,14 +170,13 @@ if __name__ == '__main__':
                         help="Don't exit when backup completes")
     parser.add_argument('-s', '--show-status', action='store_true',
                         help="Show tmutil status output")
-    parser.add_argument('-S', '--show-status-only', action='store_true',
-                        help="Show tmutil status and hide progress bar")
+    parser.add_argument('-P', '--hide-progress',
+                        dest='show_progress', action='store_false',
+                        help="Disable progress bar")
     args = parser.parse_args()
-    if args.show_status_only:
+    if args.run_indefinitely and not (args.show_status or args.show_progress):
+        # Doesn't make sense to run indefinitely without displaying anything
         args.show_status = True
-        args.show_progress = False
-    else:
-        args.show_progress = True
 
     setup_signal_handling()
 
