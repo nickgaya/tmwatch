@@ -1,4 +1,5 @@
 import plistlib
+import shutil
 import signal
 import subprocess
 import threading
@@ -6,6 +7,7 @@ import time
 from argparse import ArgumentParser
 from datetime import timedelta
 from collections import namedtuple
+from contextlib import contextmanager
 
 from progress.bar import IncrementalBar
 
@@ -99,11 +101,40 @@ def monitor(args):
 
     bar = TMBar()
     bar.start()
-    bar.set(status)
+    display(args, bar, status)
     while not (should_exit(args, status) or stop_event.wait(args.interval)):
         status = get_tm_status()
-        bar.set(status)
+        display(args, bar, status)
     bar.finish()
+
+
+def tput(arg):
+    subprocess.run(['tput', arg])
+
+
+def clear():
+    subprocess.run(['clear', '-x'])
+
+
+def truncate(str, lines, columns):
+    str_lines = str.rstrip('\n').splitlines()[:lines]
+    return '\n'.join(line[:columns] for line in str_lines)
+
+
+def display(args, bar, status):
+    if args.show_status:
+        hr_status = subprocess.run(['tmutil', 'status'],
+                                   stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE,
+                                   text=True,
+                                   check=True).stdout
+        tsize = shutil.get_terminal_size()
+        hr_status_trunc = truncate(hr_status, tsize.lines - 2, tsize.columns)
+        clear()
+        bar.set(status)
+        print('\n\n', hr_status_trunc, sep='', end='', flush=True)
+    else:
+        bar.set(status)
 
 
 def setup_signal_handling():
@@ -112,12 +143,29 @@ def setup_signal_handling():
 
     signal.signal(signal.SIGINT, handler)
 
+
+@contextmanager
+def prepare_term(args):
+    if args.show_status:
+        tput('smcup')
+    try:
+        monitor(args)
+    finally:
+        if args.show_status:
+            tput('rmcup')
+
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='Monitor Time Machine backup progress')
     parser.add_argument('-n', '--interval', type=float, default=2,
                         help="Update interval in seconds")
     parser.add_argument('-i', '--run-indefinitely', action='store_true',
                         help="Don't exit when backup completes")
+    parser.add_argument('-s', '--show-status', action='store_true',
+                        help="Show tmutil status output")
     args = parser.parse_args()
+
     setup_signal_handling()
-    monitor(args)
+
+    with prepare_term(args):
+        monitor(args)
