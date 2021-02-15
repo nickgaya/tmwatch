@@ -9,6 +9,7 @@ from progress.bar import IncrementalBar
 
 TmStatus = namedtuple('TmStatus', ('phase', 'percent', 'etr'))
 
+
 class TMBar(IncrementalBar):
 
     # Max width of Time Machine phase string
@@ -49,6 +50,7 @@ class TMBar(IncrementalBar):
         else:
             return timedelta(seconds=self.etr)
 
+
 def get_tm_status():
     raw_output = subprocess.run(['tmutil', 'status', '-X'],
                                 stdin=subprocess.DEVNULL,
@@ -75,24 +77,35 @@ def get_tm_status():
         etr=etr,
     )
 
+
+def should_exit(args, status):
+    if args.run_indefinitely:
+        return False
+    return status.phase == 'BackupNotRunning'
+
+
 def monitor(args):
     status = get_tm_status()
-    if status.phase == 'BackupNotRunning':
-        print('BackupNotRunning')
+
+    if should_exit(args, status):
+        print(status.phase)
         exit(0)
 
     bar = TMBar()
     bar.start()
     bar.set(status)
-    while status.phase != 'BackupNotRunning':
+    while not should_exit(args, status):
         time.sleep(args.interval)
         status = get_tm_status()
         bar.set(status)
     bar.finish()
 
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='Monitor Time Machine backup progress')
     parser.add_argument('-n', '--interval', type=float, default=2,
                         help="Update interval in seconds")
+    parser.add_argument('-i', '--run-indefinitely', action='store_true',
+                        help="Don't exit when backup completes")
     args = parser.parse_args()
     monitor(args)
